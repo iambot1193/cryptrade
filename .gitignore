@@ -41,3 +41,6 @@ out/
 
 ### Env ###
 .env
+
+### Planejamento local ###
+plan.md
