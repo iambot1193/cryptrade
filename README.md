@@ -43,3 +43,40 @@ curl localhost:8080/api/portfolio
 ```bash
 ./gradlew test
 ```
+
+## Estrutura do projeto
+
+```
+src/main/kotlin/com/felipelopes/cryptrade/
+├── CryptradeApplication.kt   # entry point
+├── config/
+│   └── RestClientConfig.kt   # bean do RestClient p/ CoinGecko
+├── controller/                # camada HTTP, sem regra de negocio
+│   ├── OrderController.kt     # POST/GET /api/orders
+│   ├── PortfolioController.kt # GET /api/portfolio
+│   └── PriceController.kt     # GET /api/prices/{symbol}
+├── service/
+│   ├── TradingService.kt      # regra de negocio: valida saldo/posicao,
+│   │                           # atualiza wallet, media de preco, grava ordem
+│   ├── PriceService.kt        # busca preco atual na CoinGecko
+│   └── WalletInitializer.kt   # seed do saldo inicial no boot (CommandLineRunner)
+├── domain/                    # entidades JPA
+│   ├── Wallet.kt               # saldo em caixa (linha unica, id fixo = 1)
+│   ├── Position.kt             # posicao aberta por symbol (qtd + preco medio)
+│   ├── Order.kt                # ordem executada (historico, tabela "orders")
+│   └── OrderSide.kt            # enum BUY/SELL
+├── repository/                 # Spring Data JPA (uma interface por entidade)
+├── dto/                        # request/response, isolam entidade da API
+│   ├── OrderDtos.kt
+│   └── PortfolioDtos.kt
+└── exception/
+    ├── TradingExceptions.kt        # InsufficientFunds/Position, UnknownSymbol
+    └── GlobalExceptionHandler.kt   # @RestControllerAdvice -> HTTP status certo
+```
+
+Fluxo de uma ordem: `Controller` valida DTO (`@Valid`) -> `TradingService.placeOrder`
+busca preco (`PriceService`), confere saldo/posicao, atualiza `Wallet` e `Position`,
+grava `Order` -> `GlobalExceptionHandler` traduz exceptions de negocio em HTTP 409/404.
+
+`symbol` usa o id da CoinGecko direto (`bitcoin`, `ethereum`, ...) — sem tabela de
+mapeamento ticker->id. Se quiser aceitar `BTC`/`ETH`, e o proximo ponto a adicionar.
