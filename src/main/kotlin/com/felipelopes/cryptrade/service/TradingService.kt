@@ -77,7 +77,7 @@ class TradingService(
 
     private fun applySell(quantity: BigDecimal, position: Position) {
         position.quantity -= quantity
-        if (position.quantity == BigDecimal.ZERO) {
+        if (position.quantity.compareTo(BigDecimal.ZERO) == 0) {
             positionRepository.delete(position)
         } else {
             positionRepository.save(position)

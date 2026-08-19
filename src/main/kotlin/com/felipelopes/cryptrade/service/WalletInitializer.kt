@@ -13,7 +13,7 @@ class WalletInitializer(
     @Value("\${cryptrade.wallet.starting-balance}") private val startingBalance: BigDecimal
 ) : CommandLineRunner {
 
-    override fun run(vararg args: String?) {
+    override fun run(vararg args: String) {
         if (walletRepository.count() == 0L) {
             walletRepository.save(Wallet(id = 1L, balance = startingBalance))
         }

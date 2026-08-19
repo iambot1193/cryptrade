@@ -38,7 +38,7 @@ class TradingServiceTest {
         tradingService.placeOrder(PlaceOrderRequest("bitcoin", OrderSide.SELL, BigDecimal("2")))
         portfolio = tradingService.portfolio()
         assertMoneyEquals(BigDecimal("100000.00"), portfolio.cashBalance)
-        assertEquals(emptyList(), portfolio.positions)
+        assertTrue(portfolio.positions.isEmpty())
     }
 
     @Test
