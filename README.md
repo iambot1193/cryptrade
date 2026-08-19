@@ -1,21 +1,31 @@
 # CryptRade
 
+[![CI](https://github.com/iambot1193/cryptrade/actions/workflows/ci.yml/badge.svg)](https://github.com/iambot1193/cryptrade/actions/workflows/ci.yml)
+
 Simulador de trading de criptomoedas. API REST em Kotlin + Spring Boot para compra/venda simulada com saldo virtual, posicoes e historico de ordens, usando preco real de mercado via CoinGecko.
 
 ## Stack
 
 - Kotlin + Spring Boot 4 (Web MVC, Data JPA, Validation)
-- H2 em memoria
+- Postgres + Flyway (H2 em memoria só no profile de teste)
 - Gradle (Kotlin DSL)
-- Preco de mercado: [CoinGecko API](https://www.coingecko.com/en/api) (publica, sem chave)
+- Preco de mercado: [CoinGecko API](https://www.coingecko.com/en/api) (publica, sem chave) — profile `demo`/`test` usa preco fake deterministico, sem dependencia de rede
 
 ## Rodando
 
 ```bash
-./gradlew bootRun
+cp .env.example .env
+docker compose up --build
 ```
 
-App sobe em `http://localhost:8080`. Console H2 em `/h2-console` (JDBC URL `jdbc:h2:mem:cryptrade`).
+App sobe em `http://localhost:8080` (Postgres em `localhost:5432`). Profile `demo` (default do compose)
+usa `FakePriceProvider`, sem chamar a CoinGecko.
+
+Sem Docker, direto com Postgres local:
+
+```bash
+./gradlew bootRun
+```
 
 Carteira comeca com saldo virtual de 100000.00 (configuravel em `application.yml`).
 
@@ -58,7 +68,10 @@ src/main/kotlin/com/felipelopes/cryptrade/
 ├── service/
 │   ├── TradingService.kt      # regra de negocio: valida saldo/posicao,
 │   │                           # atualiza wallet, media de preco, grava ordem
-│   ├── PriceService.kt        # busca preco atual na CoinGecko
+│   ├── PriceService.kt        # delega pro PriceProvider ativo
+│   ├── PriceProvider.kt       # interface: fonte de preco
+│   ├── CoinGeckoPriceProvider.kt  # preco real (profile default/prod)
+│   ├── FakePriceProvider.kt       # preco fake deterministico (profile test/demo)
 │   └── WalletInitializer.kt   # seed do saldo inicial no boot (CommandLineRunner)
 ├── domain/                    # entidades JPA
 │   ├── Wallet.kt               # saldo em caixa (linha unica, id fixo = 1)

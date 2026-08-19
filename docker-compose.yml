@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cryptrade}
+      POSTGRES_USER: ${POSTGRES_USER:-cryptrade}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cryptrade}
+    ports:
+      - "5432:5432"
+    volumes:
+      - cryptrade-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cryptrade}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-cryptrade}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-cryptrade}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-cryptrade}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-demo}
+    ports:
+      - "8080:8080"
+
+volumes:
+  cryptrade-db:

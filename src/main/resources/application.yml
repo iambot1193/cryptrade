@@ -2,16 +2,17 @@ spring:
   application:
     name: cryptrade
   datasource:
-    url: jdbc:h2:mem:cryptrade;DB_CLOSE_DELAY=-1
-    driver-class-name: org.h2.Driver
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/cryptrade}
+    username: ${SPRING_DATASOURCE_USERNAME:cryptrade}
+    password: ${SPRING_DATASOURCE_PASSWORD:cryptrade}
+    driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     open-in-view: false
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 cryptrade:
   wallet:
