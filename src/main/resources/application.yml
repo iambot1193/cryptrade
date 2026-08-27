@@ -19,3 +19,10 @@ cryptrade:
     starting-balance: 100000.00
   pricing:
     coingecko-base-url: https://api.coingecko.com/api/v3
+  validator:
+    private-key-base64: ${CRYPTRADE_VALIDATOR_PRIVATE_KEY:}
+    public-key-base64: ${CRYPTRADE_VALIDATOR_PUBLIC_KEY:}
+  admin:
+    address: ${CRYPTRADE_ADMIN_ADDRESS:}
+  auth:
+    jwt-secret-base64: ${CRYPTRADE_JWT_SECRET:}
