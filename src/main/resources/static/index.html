@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CryptRade - cliente de referência</title>
+<script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #131a22; --border: #253140; --text: #e6edf3;
+    --muted: #8b98a5; --accent: #4fa8ff; --good: #3fb950; --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text); font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    margin: 0; padding: 24px; max-width: 980px; margin-inline: auto; line-height: 1.5;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
+  section {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  h2 { font-size: 0.95rem; margin: 0 0 12px; color: var(--accent); }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; margin-top: 10px; }
+  input, select {
+    width: 100%; background: #0d1218; border: 1px solid var(--border); color: var(--text);
+    padding: 8px; border-radius: 4px; font-family: inherit; font-size: 0.85rem;
+  }
+  button {
+    background: var(--accent); color: #04101c; border: none; padding: 8px 14px;
+    border-radius: 4px; cursor: pointer; font-family: inherit; font-weight: 600; font-size: 0.85rem;
+    margin-top: 12px; margin-right: 8px;
+  }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 160px; }
+  .kv { font-size: 0.82rem; margin: 4px 0; word-break: break-all; }
+  .kv b { color: var(--muted); font-weight: 500; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; }
+  .pill.ok { background: rgba(63,185,80,0.15); color: var(--good); }
+  .pill.err { background: rgba(248,81,73,0.15); color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 8px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  #log {
+    background: #0d1218; border: 1px solid var(--border); border-radius: 4px; padding: 10px;
+    font-size: 0.75rem; max-height: 320px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+  }
+  #log .entry { margin-bottom: 10px; border-bottom: 1px dashed var(--border); padding-bottom: 8px; }
+  #log .req { color: var(--accent); }
+  #log .res-ok { color: var(--good); }
+  #log .res-err { color: var(--bad); }
+  .warn { color: var(--bad); font-size: 0.78rem; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<h1>CryptRade</h1>
+<div class="subtitle">
+  Cliente de referência do ledger event-sourced tamper-evident. Chave privada gerada e assinada
+  no navegador (tweetnacl-js) - o servidor nunca vê nem armazena a privada.
+</div>
+
+<section>
+  <h2>1. Chave (conta local)</h2>
+  <div class="kv"><b>Address:</b> <span id="address">nenhuma chave carregada</span></div>
+  <div class="kv"><b>Public key:</b> <span id="publicKey">-</span></div>
+  <button id="btnGenerateKey">Gerar novo par de chaves</button>
+  <button id="btnClearKey" class="secondary">Esquecer chave (localStorage)</button>
+  <div class="warn">Demo: privada fica em localStorage sem criptografia. Nunca faça isso em produção.</div>
+</section>
+
+<section>
+  <h2>2. Conta no ledger</h2>
+  <button id="btnCreateAccount" disabled>POST /accounts</button>
+  <button id="btnLogin" disabled>Login (challenge + assinatura)</button>
+  <div class="kv"><b>Sessão:</b> <span id="sessionStatus">deslogado</span></div>
+</section>
+
+<section>
+  <h2>3. Cotação + ordem assinada</h2>
+  <div class="row">
+    <div>
+      <label>Symbol</label>
+      <select id="symbol">
+        <option value="bitcoin">bitcoin</option>
+        <option value="ethereum">ethereum</option>
+        <option value="solana">solana</option>
+      </select>
+    </div>
+    <div>
+      <label>Side</label>
+      <select id="side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>
+    </div>
+    <div>
+      <label>Quantity</label>
+      <input id="quantity" value="0.01">
+    </div>
+  </div>
+  <button id="btnQuote" disabled>POST /quotes</button>
+  <div id="quoteBox" class="kv"></div>
+  <button id="btnConfirmOrder" disabled>Assinar { quoteId, quantity } e enviar POST /api/orders</button>
+</section>
+
+<section>
+  <h2>4. Portfolio</h2>
+  <button id="btnPortfolio" disabled>GET /api/portfolio</button>
+  <table id="portfolioTable" style="display:none">
+    <thead><tr><th>Symbol</th><th>Qty</th><th>Preço médio</th><th>Preço atual</th><th>P&amp;L</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <div class="kv"><b>Cash balance:</b> <span id="cashBalance">-</span></div>
+  <div class="kv"><b>Total equity:</b> <span id="totalEquity">-</span></div>
+</section>
+
+<section>
+  <h2>5. Integridade do ledger</h2>
+  <button id="btnVerify">GET /ledger/verify</button>
+  <div class="kv"><b>Status:</b> <span id="verifyStatus">-</span></div>
+  <div class="subtitle" style="margin-top:8px">
+    Pra ver isso acusar adulteração: pare o app, rode
+    <code>UPDATE ledger_blocks SET hash = 'deadbeef' WHERE block_index = 0;</code> direto no
+    Postgres, suba de novo e clique aqui outra vez.
+  </div>
+</section>
+
+<section>
+  <h2>Log de requisições</h2>
+  <div id="log"></div>
+</section>
+
+<script>
+const API_BASE = window.location.origin;
+const state = { keyPair: null, address: null, accessToken: null, refreshToken: null };
+
+// --- base64 <-> bytes, sem lib extra (btoa/atob operam em string binaria) ---
+function bytesToBase64(bytes) {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+function base64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// --- serializacao canonica: espelha CanonicalSerializer.kt campo a campo -
+// prefixo de 4 bytes big-endian com o tamanho + UTF-8, concatenados. Mesma entrada,
+// mesmo hash nos dois lados (ver plan.md "Riscos conhecidos"). ---
+function canonicalize(fields) {
+  const encoder = new TextEncoder();
+  const encodedFields = fields.map(f => encoder.encode(f));
+  const totalLength = encodedFields.reduce((sum, f) => sum + 4 + f.length, 0);
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const f of encodedFields) {
+    out[offset++] = (f.length >>> 24) & 0xFF;
+    out[offset++] = (f.length >>> 16) & 0xFF;
+    out[offset++] = (f.length >>> 8) & 0xFF;
+    out[offset++] = f.length & 0xFF;
+    out.set(f, offset);
+    offset += f.length;
+  }
+  return out;
+}
+
+// Ponytail: toFixed em vez de BigDecimal (JS nao tem) - preciso o bastante pras
+// quantidades pequenas de uma demo, upgrade pra lib decimal se precision real importar.
+function decimalField(numberLike, scale = 8) {
+  return Number(numberLike).toFixed(scale);
+}
+
+function sha256Hex(bytes) {
+  return crypto.subtle.digest("SHA-256", bytes).then(buf =>
+    Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("")
+  );
+}
+
+// --- log de requisicoes ---
+function log(method, path, reqBody, status, resBody) {
+  const el = document.getElementById("log");
+  const entry = document.createElement("div");
+  entry.className = "entry";
+  const ok = status >= 200 && status < 300;
+  entry.innerHTML =
+    `<div class="req">${method} ${path}</div>` +
+    (reqBody ? `<div>&gt; ${JSON.stringify(reqBody)}</div>` : "") +
+    `<div class="${ok ? "res-ok" : "res-err"}">${status} ${JSON.stringify(resBody)}</div>`;
+  el.prepend(entry);
+}
+
+async function api(method, path, body, auth) {
+  const headers = { "Content-Type": "application/json" };
+  if (auth) headers["Authorization"] = "Bearer " + state.accessToken;
+  const response = await fetch(API_BASE + path, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const text = await response.text();
+  let json;
+  try { json = text ? JSON.parse(text) : {}; } catch { json = text; }
+  log(method, path, body, response.status, json);
+  if (!response.ok) throw new Error(`${method} ${path} -> ${response.status}: ${JSON.stringify(json)}`);
+  return json;
+}
+
+// --- 1. chave ---
+function loadKeyFromStorage() {
+  const stored = localStorage.getItem("cryptrade-keypair");
+  if (!stored) return;
+  const { secretKey } = JSON.parse(stored);
+  state.keyPair = nacl.sign.keyPair.fromSecretKey(base64ToBytes(secretKey));
+  refreshKeyUi();
+}
+
+async function refreshKeyUi() {
+  const hasKey = !!state.keyPair;
+  document.getElementById("btnCreateAccount").disabled = !hasKey;
+  document.getElementById("btnLogin").disabled = !hasKey;
+  if (!hasKey) {
+    document.getElementById("address").textContent = "nenhuma chave carregada";
+    document.getElementById("publicKey").textContent = "-";
+    return;
+  }
+  const publicKeyB64 = bytesToBase64(state.keyPair.publicKey);
+  document.getElementById("publicKey").textContent = publicKeyB64;
+  state.address = await sha256Hex(state.keyPair.publicKey);
+  document.getElementById("address").textContent = state.address;
+}
+
+document.getElementById("btnGenerateKey").onclick = () => {
+  state.keyPair = nacl.sign.keyPair();
+  localStorage.setItem("cryptrade-keypair", JSON.stringify({
+    secretKey: bytesToBase64(state.keyPair.secretKey)
+  }));
+  state.accessToken = null;
+  document.getElementById("sessionStatus").textContent = "deslogado";
+  refreshKeyUi();
+};
+
+document.getElementById("btnClearKey").onclick = () => {
+  localStorage.removeItem("cryptrade-keypair");
+  state.keyPair = null;
+  state.accessToken = null;
+  document.getElementById("sessionStatus").textContent = "deslogado";
+  refreshKeyUi();
+};
+
+// --- 2. conta + login ---
+document.getElementById("btnCreateAccount").onclick = async () => {
+  const publicKeyB64 = bytesToBase64(state.keyPair.publicKey);
+  const signature = nacl.sign.detached(state.keyPair.publicKey, state.keyPair.secretKey);
+  try {
+    const res = await api("POST", "/accounts", {
+      publicKey: publicKeyB64,
+      signature: bytesToBase64(signature)
+    });
+    alert("Conta criada: " + res.address);
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
+document.getElementById("btnLogin").onclick = async () => {
+  try {
+    const challenge = await api("GET", `/auth/challenge?address=${state.address}`);
+    const nonceBytes = new TextEncoder().encode(challenge.nonce);
+    const signature = nacl.sign.detached(nonceBytes, state.keyPair.secretKey);
+    const tokens = await api("POST", "/auth/verify", {
+      address: state.address,
+      signature: bytesToBase64(signature)
+    });
+    state.accessToken = tokens.accessToken;
+    state.refreshToken = tokens.refreshToken;
+    document.getElementById("sessionStatus").textContent =
+      `logado, token expira ${new Date(tokens.expiresAt).toLocaleTimeString()}`;
+    document.getElementById("btnQuote").disabled = false;
+    document.getElementById("btnPortfolio").disabled = false;
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
+// --- 3. cotacao + ordem ---
+let currentQuote = null;
+
+document.getElementById("btnQuote").onclick = async () => {
+  const symbol = document.getElementById("symbol").value;
+  const side = document.getElementById("side").value;
+  const quantity = document.getElementById("quantity").value;
+  try {
+    currentQuote = await api("POST", "/quotes", { symbol, side, quantity: Number(quantity) }, true);
+    document.getElementById("quoteBox").innerHTML =
+      `quoteId=${currentQuote.quoteId}<br>preço=${currentQuote.price}` +
+      `<br>expira=${new Date(currentQuote.expiresAt).toLocaleTimeString()}`;
+    document.getElementById("btnConfirmOrder").disabled = false;
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
+document.getElementById("btnConfirmOrder").onclick = async () => {
+  if (!currentQuote) return;
+  const fields = canonicalize([currentQuote.quoteId, decimalField(currentQuote.quantity, 8)]);
+  const signature = nacl.sign.detached(fields, state.keyPair.secretKey);
+  try {
+    await api("POST", "/api/orders", {
+      quoteId: currentQuote.quoteId,
+      signature: bytesToBase64(signature)
+    }, true);
+    currentQuote = null;
+    document.getElementById("btnConfirmOrder").disabled = true;
+    document.getElementById("quoteBox").innerHTML = "";
+    document.getElementById("btnPortfolio").onclick();
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
+// --- 4. portfolio ---
+document.getElementById("btnPortfolio").onclick = async () => {
+  try {
+    const p = await api("GET", "/api/portfolio", null, true);
+    document.getElementById("cashBalance").textContent = p.cashBalance;
+    document.getElementById("totalEquity").textContent = p.totalEquity;
+    const tbody = document.querySelector("#portfolioTable tbody");
+    tbody.innerHTML = "";
+    for (const pos of p.positions) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `<td>${pos.symbol}</td><td>${pos.quantity}</td><td>${pos.averagePrice}</td>` +
+        `<td>${pos.currentPrice}</td><td>${pos.profitLoss}</td>`;
+      tbody.appendChild(tr);
+    }
+    document.getElementById("portfolioTable").style.display = p.positions.length ? "table" : "none";
+  } catch (e) {
+    alert(e.message);
+  }
+};
+
+// --- 5. verify ---
+document.getElementById("btnVerify").onclick = async () => {
+  const res = await api("GET", "/ledger/verify");
+  const el = document.getElementById("verifyStatus");
+  if (res.valid) {
+    el.innerHTML = `<span class="pill ok">válido</span>`;
+  } else {
+    el.innerHTML = `<span class="pill err">adulterado - bloco ${res.brokenAtBlock} (${res.reason})</span>`;
+  }
+};
+
+loadKeyFromStorage();
+</script>
+
+</body>
+</html>
