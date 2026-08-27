@@ -23,7 +23,7 @@ class LedgerService(
     private val blockRepository: LedgerBlockRepository,
     private val entryRepository: LedgerEntryRepository,
     private val accountRepository: AccountRepository,
-    private val positionRepository: LedgerPositionRepository,
+    private val positionRepository: PositionRepository,
     private val validatorKeys: ValidatorKeyProvider,
     transactionManager: PlatformTransactionManager
 ) {

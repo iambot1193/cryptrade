@@ -1,6 +1,6 @@
 package com.felipelopes.cryptrade.dto
 
-import com.felipelopes.cryptrade.domain.Position
+import com.felipelopes.cryptrade.ledger.Position
 import java.math.BigDecimal
 
 data class PositionResponse(

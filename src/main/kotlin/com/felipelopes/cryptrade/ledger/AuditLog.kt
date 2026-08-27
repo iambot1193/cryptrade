@@ -5,18 +5,18 @@ import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
 import jakarta.persistence.Table
-import java.math.BigDecimal
+import java.time.Instant
 
-/** Projecao derivada do ledger, por (address, symbol) - recalculavel via replay dos ORDER. */
+/** So o que NAO vira bloco: login falho, assinatura rejeitada, cotacao expirada, acao de admin. */
 @Entity
-@Table(name = "positions")
-class Position(
+@Table(name = "audit_log")
+class AuditLog(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long? = null,
 
     val address: String,
-    val symbol: String,
-    var quantity: BigDecimal = BigDecimal.ZERO,
-    var averagePrice: BigDecimal = BigDecimal.ZERO
+    val action: String,
+    val timestamp: Instant = Instant.now(),
+    val metadata: String? = null
 )

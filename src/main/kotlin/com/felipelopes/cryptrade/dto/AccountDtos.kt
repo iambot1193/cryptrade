@@ -2,16 +2,12 @@ package com.felipelopes.cryptrade.dto
 
 import jakarta.validation.constraints.NotBlank
 
-data class PlaceOrderRequest(
+data class CreateAccountRequest(
     @field:NotBlank
-    val quoteId: String,
+    val publicKey: String,
 
     @field:NotBlank
     val signature: String
 )
 
-data class OrderResponse(
-    val blockIndex: Long,
-    val hash: String,
-    val quoteId: String
-)
+data class CreateAccountResponse(val address: String)

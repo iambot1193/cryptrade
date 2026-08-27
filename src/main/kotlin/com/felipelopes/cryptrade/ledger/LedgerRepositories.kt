@@ -4,8 +4,9 @@ import org.springframework.data.jpa.repository.JpaRepository
 
 interface AccountRepository : JpaRepository<Account, String>
 
-interface LedgerPositionRepository : JpaRepository<Position, Long> {
+interface PositionRepository : JpaRepository<Position, Long> {
     fun findByAddressAndSymbol(address: String, symbol: String): Position?
+    fun findByAddress(address: String): List<Position>
 }
 
 interface LedgerBlockRepository : JpaRepository<LedgerBlock, Long> {
@@ -15,4 +16,12 @@ interface LedgerBlockRepository : JpaRepository<LedgerBlock, Long> {
 
 interface LedgerEntryRepository : JpaRepository<LedgerEntry, Long> {
     fun findByBlockIndexOrderBySequenceInBlockAsc(blockIndex: Long): List<LedgerEntry>
+}
+
+interface QuoteRepository : JpaRepository<Quote, String>
+
+interface RefreshTokenRepository : JpaRepository<RefreshToken, String>
+
+interface AuditLogRepository : JpaRepository<AuditLog, Long> {
+    fun findAllByOrderByTimestampDesc(): List<AuditLog>
 }

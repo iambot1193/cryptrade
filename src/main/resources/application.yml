@@ -15,7 +15,7 @@ spring:
     locations: classpath:db/migration
 
 cryptrade:
-  wallet:
+  account:
     starting-balance: 100000.00
   pricing:
     coingecko-base-url: https://api.coingecko.com/api/v3

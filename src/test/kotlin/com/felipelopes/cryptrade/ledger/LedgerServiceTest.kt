@@ -17,7 +17,7 @@ class LedgerServiceTest {
     lateinit var accountRepository: AccountRepository
 
     @Autowired
-    lateinit var positionRepository: LedgerPositionRepository
+    lateinit var positionRepository: PositionRepository
 
     @Test
     fun `append applies ORDER projection to balance and position`() {
