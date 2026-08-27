@@ -15,6 +15,7 @@
     background: var(--bg); color: var(--text); font-family: ui-monospace, "SF Mono", Consolas, monospace;
     margin: 0; padding: 24px; max-width: 980px; margin-inline: auto; line-height: 1.5;
   }
+  :root[data-mode="client"] body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
   h1 { font-size: 1.3rem; margin-bottom: 4px; }
   .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 24px; }
   section {
@@ -53,80 +54,173 @@
   #log .res-ok { color: var(--good); }
   #log .res-err { color: var(--bad); }
   .warn { color: var(--bad); font-size: 0.78rem; margin-top: 8px; }
+
+  /* --- toggle dev/cliente --- */
+  .mode-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .mode-label { font-size: 0.8rem; color: var(--muted); }
+  .mode-label.active { color: var(--text); font-weight: 600; }
+  .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; cursor: pointer; inset: 0; background: var(--border);
+    border-radius: 24px; transition: 0.15s;
+  }
+  .slider::before {
+    content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px;
+    background: var(--text); border-radius: 50%; transition: 0.15s;
+  }
+  .switch input:checked + .slider { background: var(--accent); }
+  .switch input:checked + .slider::before { transform: translateX(20px); background: #04101c; }
+
+  /* --- banner de status (substitui alert()) --- */
+  .status-banner {
+    padding: 10px 14px; border-radius: 6px; font-size: 0.85rem; margin-bottom: 16px; display: none;
+  }
+  .status-banner.info { background: rgba(79,168,255,0.12); color: var(--accent); border: 1px solid rgba(79,168,255,0.3); }
+  .status-banner.ok { background: rgba(63,185,80,0.12); color: var(--good); border: 1px solid rgba(63,185,80,0.3); }
+  .status-banner.err { background: rgba(248,81,73,0.12); color: var(--bad); border: 1px solid rgba(248,81,73,0.3); }
+
+  /* --- alternancia de modo --- */
+  :root[data-mode="client"] .dev-only { display: none !important; }
+  :root[data-mode="dev"] .client-only { display: none !important; }
+  :root[data-mode="dev"] .label-client { display: none; }
+  :root[data-mode="client"] .label-dev { display: none; }
 </style>
 </head>
 <body>
 
+<div class="mode-bar">
+  <span class="mode-label" id="modeLabelDev">Dev</span>
+  <label class="switch">
+    <input type="checkbox" id="modeToggle">
+    <span class="slider"></span>
+  </label>
+  <span class="mode-label" id="modeLabelClient">Cliente</span>
+</div>
+
+<div id="statusBanner" class="status-banner"></div>
+
 <h1>CryptRade</h1>
-<div class="subtitle">
+<div class="subtitle dev-only">
   Cliente de referência do ledger event-sourced tamper-evident. Chave privada gerada e assinada
   no navegador (tweetnacl-js) - o servidor nunca vê nem armazena a privada.
 </div>
+<div class="subtitle client-only">
+  Compre e venda criptomoedas com um histórico que ninguém consegue adulterar sem deixar rastro.
+</div>
 
 <section>
-  <h2>1. Chave (conta local)</h2>
-  <div class="kv"><b>Address:</b> <span id="address">nenhuma chave carregada</span></div>
-  <div class="kv"><b>Public key:</b> <span id="publicKey">-</span></div>
-  <button id="btnGenerateKey">Gerar novo par de chaves</button>
-  <button id="btnClearKey" class="secondary">Esquecer chave (localStorage)</button>
-  <div class="warn">Demo: privada fica em localStorage sem criptografia. Nunca faça isso em produção.</div>
+  <h2>
+    <span class="label-dev">1. Chave (conta local)</span>
+    <span class="label-client">Sua carteira</span>
+  </h2>
+  <div class="kv dev-only"><b>Address:</b> <span id="addressFull">nenhuma chave carregada</span></div>
+  <div class="kv dev-only"><b>Public key:</b> <span id="publicKey">-</span></div>
+  <div class="kv client-only"><b>Seu endereço:</b> <span id="addressShort">nenhuma carteira ainda</span></div>
+  <button id="btnGenerateKey">
+    <span class="label-dev">Gerar novo par de chaves</span>
+    <span class="label-client">Criar carteira nova</span>
+  </button>
+  <button id="btnClearKey" class="secondary">
+    <span class="label-dev">Esquecer chave (localStorage)</span>
+    <span class="label-client">Esquecer esta carteira</span>
+  </button>
+  <div class="warn dev-only">Demo: privada fica em localStorage sem criptografia. Nunca faça isso em produção.</div>
+  <div class="subtitle client-only" style="margin-top:8px">
+    Sua chave fica guardada só neste navegador. É ela que assina tudo que você faz - o site
+    nunca vê nem envia sua chave privada pra ninguém.
+  </div>
 </section>
 
 <section>
-  <h2>2. Conta no ledger</h2>
-  <button id="btnCreateAccount" disabled>POST /accounts</button>
-  <button id="btnLogin" disabled>Login (challenge + assinatura)</button>
-  <div class="kv"><b>Sessão:</b> <span id="sessionStatus">deslogado</span></div>
+  <h2>
+    <span class="label-dev">2. Conta no ledger</span>
+    <span class="label-client">Criar conta e entrar</span>
+  </h2>
+  <button id="btnCreateAccount" disabled>
+    <span class="label-dev">POST /accounts</span>
+    <span class="label-client">Criar minha conta</span>
+  </button>
+  <button id="btnLogin" disabled>
+    <span class="label-dev">Login (challenge + assinatura)</span>
+    <span class="label-client">Entrar</span>
+  </button>
+  <div class="kv"><b><span class="label-dev">Sessão:</span><span class="label-client">Status:</span></b> <span id="sessionStatus">deslogado</span></div>
 </section>
 
 <section>
-  <h2>3. Cotação + ordem assinada</h2>
+  <h2>
+    <span class="label-dev">3. Cotação + ordem assinada</span>
+    <span class="label-client">Comprar e vender</span>
+  </h2>
   <div class="row">
     <div>
-      <label>Symbol</label>
+      <label><span class="label-dev">Symbol</span><span class="label-client">Criptomoeda</span></label>
       <select id="symbol">
-        <option value="bitcoin">bitcoin</option>
-        <option value="ethereum">ethereum</option>
-        <option value="solana">solana</option>
+        <option value="bitcoin">Bitcoin</option>
+        <option value="ethereum">Ethereum</option>
+        <option value="solana">Solana</option>
       </select>
     </div>
     <div>
-      <label>Side</label>
+      <label><span class="label-dev">Side</span><span class="label-client">Operação</span></label>
       <select id="side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>
     </div>
     <div>
-      <label>Quantity</label>
+      <label><span class="label-dev">Quantity</span><span class="label-client">Quantidade</span></label>
       <input id="quantity" value="0.01">
     </div>
   </div>
-  <button id="btnQuote" disabled>POST /quotes</button>
+  <button id="btnQuote" disabled>
+    <span class="label-dev">POST /quotes</span>
+    <span class="label-client">Ver preço</span>
+  </button>
   <div id="quoteBox" class="kv"></div>
-  <button id="btnConfirmOrder" disabled>Assinar { quoteId, quantity } e enviar POST /api/orders</button>
+  <button id="btnConfirmOrder" disabled>
+    <span class="label-dev">Assinar { quoteId, quantity } e enviar POST /api/orders</span>
+    <span class="label-client">Confirmar</span>
+  </button>
 </section>
 
 <section>
-  <h2>4. Portfolio</h2>
-  <button id="btnPortfolio" disabled>GET /api/portfolio</button>
+  <h2>
+    <span class="label-dev">4. Portfolio</span>
+    <span class="label-client">Seu portfólio</span>
+  </h2>
+  <button id="btnPortfolio" disabled>
+    <span class="label-dev">GET /api/portfolio</span>
+    <span class="label-client">Atualizar</span>
+  </button>
   <table id="portfolioTable" style="display:none">
-    <thead><tr><th>Symbol</th><th>Qty</th><th>Preço médio</th><th>Preço atual</th><th>P&amp;L</th></tr></thead>
+    <thead><tr><th>Symbol</th><th>Qtd</th><th class="dev-only">Preço médio</th><th>Preço atual</th><th>P&amp;L</th></tr></thead>
     <tbody></tbody>
   </table>
-  <div class="kv"><b>Cash balance:</b> <span id="cashBalance">-</span></div>
-  <div class="kv"><b>Total equity:</b> <span id="totalEquity">-</span></div>
+  <div class="kv"><b><span class="label-dev">Cash balance:</span><span class="label-client">Saldo em caixa:</span></b> <span id="cashBalance">-</span></div>
+  <div class="kv"><b><span class="label-dev">Total equity:</span><span class="label-client">Patrimônio total:</span></b> <span id="totalEquity">-</span></div>
 </section>
 
 <section>
-  <h2>5. Integridade do ledger</h2>
-  <button id="btnVerify">GET /ledger/verify</button>
+  <h2>
+    <span class="label-dev">5. Integridade do ledger</span>
+    <span class="label-client">Verificar segurança</span>
+  </h2>
+  <button id="btnVerify">
+    <span class="label-dev">GET /ledger/verify</span>
+    <span class="label-client">Verificar agora</span>
+  </button>
   <div class="kv"><b>Status:</b> <span id="verifyStatus">-</span></div>
-  <div class="subtitle" style="margin-top:8px">
+  <div class="subtitle dev-only" style="margin-top:8px">
     Pra ver isso acusar adulteração: pare o app, rode
     <code>UPDATE ledger_blocks SET hash = 'deadbeef' WHERE block_index = 0;</code> direto no
     Postgres, suba de novo e clique aqui outra vez.
   </div>
+  <div class="subtitle client-only" style="margin-top:8px">
+    Confere se alguém mexeu no histórico das suas transações por fora do sistema. Se estiver
+    tudo certo, ninguém adulterou nada.
+  </div>
 </section>
 
-<section>
+<section class="dev-only">
   <h2>Log de requisições</h2>
   <div id="log"></div>
 </section>
@@ -134,6 +228,21 @@
 <script>
 const API_BASE = window.location.origin;
 const state = { keyPair: null, address: null, accessToken: null, refreshToken: null };
+
+// --- modo dev/cliente: mesma pagina, so rotulo e o log tecnico mudam de visibilidade
+// (ver CSS [data-mode]) - a logica e as chamadas de API abaixo sao identicas nos dois. ---
+function applyMode(mode) {
+  document.documentElement.setAttribute("data-mode", mode);
+  localStorage.setItem("cryptrade-ui-mode", mode);
+  document.getElementById("modeToggle").checked = mode === "client";
+  document.getElementById("modeLabelDev").classList.toggle("active", mode === "dev");
+  document.getElementById("modeLabelClient").classList.toggle("active", mode === "client");
+  const sideSelect = document.getElementById("side");
+  const isClient = mode === "client";
+  sideSelect.options[0].text = isClient ? "Comprar" : "BUY";
+  sideSelect.options[1].text = isClient ? "Vender" : "SELL";
+}
+document.getElementById("modeToggle").onchange = (e) => applyMode(e.target.checked ? "client" : "dev");
 
 // --- base64 <-> bytes, sem lib extra (btoa/atob operam em string binaria) ---
 function bytesToBase64(bytes) {
@@ -180,7 +289,21 @@ function sha256Hex(bytes) {
   );
 }
 
-// --- log de requisicoes ---
+function shortAddress(address) {
+  return address.slice(0, 8) + "…" + address.slice(-6);
+}
+
+// --- banner de status, substitui alert() nos dois modos ---
+function showStatus(message, kind = "info") {
+  const el = document.getElementById("statusBanner");
+  el.textContent = message;
+  el.className = "status-banner " + kind;
+  el.style.display = "block";
+  clearTimeout(showStatus._t);
+  showStatus._t = setTimeout(() => { el.style.display = "none"; }, 6000);
+}
+
+// --- log de requisicoes (so aparece no modo dev) ---
 function log(method, path, reqBody, status, resBody) {
   const el = document.getElementById("log");
   const entry = document.createElement("div");
@@ -223,14 +346,16 @@ async function refreshKeyUi() {
   document.getElementById("btnCreateAccount").disabled = !hasKey;
   document.getElementById("btnLogin").disabled = !hasKey;
   if (!hasKey) {
-    document.getElementById("address").textContent = "nenhuma chave carregada";
+    document.getElementById("addressFull").textContent = "nenhuma chave carregada";
+    document.getElementById("addressShort").textContent = "nenhuma carteira ainda";
     document.getElementById("publicKey").textContent = "-";
     return;
   }
   const publicKeyB64 = bytesToBase64(state.keyPair.publicKey);
   document.getElementById("publicKey").textContent = publicKeyB64;
   state.address = await sha256Hex(state.keyPair.publicKey);
-  document.getElementById("address").textContent = state.address;
+  document.getElementById("addressFull").textContent = state.address;
+  document.getElementById("addressShort").textContent = shortAddress(state.address);
 }
 
 document.getElementById("btnGenerateKey").onclick = () => {
@@ -260,9 +385,9 @@ document.getElementById("btnCreateAccount").onclick = async () => {
       publicKey: publicKeyB64,
       signature: bytesToBase64(signature)
     });
-    alert("Conta criada: " + res.address);
+    showStatus("Conta criada: " + shortAddress(res.address), "ok");
   } catch (e) {
-    alert(e.message);
+    showStatus(e.message, "err");
   }
 };
 
@@ -281,8 +406,9 @@ document.getElementById("btnLogin").onclick = async () => {
       `logado, token expira ${new Date(tokens.expiresAt).toLocaleTimeString()}`;
     document.getElementById("btnQuote").disabled = false;
     document.getElementById("btnPortfolio").disabled = false;
+    showStatus("Login feito.", "ok");
   } catch (e) {
-    alert(e.message);
+    showStatus(e.message, "err");
   }
 };
 
@@ -295,12 +421,13 @@ document.getElementById("btnQuote").onclick = async () => {
   const quantity = document.getElementById("quantity").value;
   try {
     currentQuote = await api("POST", "/quotes", { symbol, side, quantity: Number(quantity) }, true);
+    const expiraEm = new Date(currentQuote.expiresAt).toLocaleTimeString();
     document.getElementById("quoteBox").innerHTML =
-      `quoteId=${currentQuote.quoteId}<br>preço=${currentQuote.price}` +
-      `<br>expira=${new Date(currentQuote.expiresAt).toLocaleTimeString()}`;
+      `<span class="dev-only">quoteId=${currentQuote.quoteId}<br>preço=${currentQuote.price}<br>expira=${expiraEm}</span>` +
+      `<span class="client-only">Preço: <b>${currentQuote.price}</b> · válido até ${expiraEm}</span>`;
     document.getElementById("btnConfirmOrder").disabled = false;
   } catch (e) {
-    alert(e.message);
+    showStatus(e.message, "err");
   }
 };
 
@@ -316,9 +443,10 @@ document.getElementById("btnConfirmOrder").onclick = async () => {
     currentQuote = null;
     document.getElementById("btnConfirmOrder").disabled = true;
     document.getElementById("quoteBox").innerHTML = "";
+    showStatus("Ordem executada.", "ok");
     document.getElementById("btnPortfolio").onclick();
   } catch (e) {
-    alert(e.message);
+    showStatus(e.message, "err");
   }
 };
 
@@ -332,13 +460,13 @@ document.getElementById("btnPortfolio").onclick = async () => {
     tbody.innerHTML = "";
     for (const pos of p.positions) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${pos.symbol}</td><td>${pos.quantity}</td><td>${pos.averagePrice}</td>` +
+      tr.innerHTML = `<td>${pos.symbol}</td><td>${pos.quantity}</td><td class="dev-only">${pos.averagePrice}</td>` +
         `<td>${pos.currentPrice}</td><td>${pos.profitLoss}</td>`;
       tbody.appendChild(tr);
     }
     document.getElementById("portfolioTable").style.display = p.positions.length ? "table" : "none";
   } catch (e) {
-    alert(e.message);
+    showStatus(e.message, "err");
   }
 };
 
@@ -346,13 +474,19 @@ document.getElementById("btnPortfolio").onclick = async () => {
 document.getElementById("btnVerify").onclick = async () => {
   const res = await api("GET", "/ledger/verify");
   const el = document.getElementById("verifyStatus");
+  const isClient = document.documentElement.getAttribute("data-mode") === "client";
   if (res.valid) {
-    el.innerHTML = `<span class="pill ok">válido</span>`;
+    el.innerHTML = isClient
+      ? `<span class="pill ok">tudo certo, nada foi alterado</span>`
+      : `<span class="pill ok">válido</span>`;
   } else {
-    el.innerHTML = `<span class="pill err">adulterado - bloco ${res.brokenAtBlock} (${res.reason})</span>`;
+    el.innerHTML = isClient
+      ? `<span class="pill err">atenção: histórico alterado (bloco ${res.brokenAtBlock})</span>`
+      : `<span class="pill err">adulterado - bloco ${res.brokenAtBlock} (${res.reason})</span>`;
   }
 };
 
+applyMode(localStorage.getItem("cryptrade-ui-mode") || "dev");
 loadKeyFromStorage();
 </script>
 
