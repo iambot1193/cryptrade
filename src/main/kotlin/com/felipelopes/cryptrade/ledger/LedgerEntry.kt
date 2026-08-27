@@ -1,5 +1,6 @@
 package com.felipelopes.cryptrade.ledger
 
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -23,6 +24,7 @@ class LedgerEntry(
     @Enumerated(EnumType.STRING)
     val type: EntryType,
 
+    @Column(length = 4000)
     val payload: ByteArray,
 
     val quoteId: String? = null,

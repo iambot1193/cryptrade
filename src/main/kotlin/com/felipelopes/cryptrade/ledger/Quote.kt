@@ -1,6 +1,7 @@
 package com.felipelopes.cryptrade.ledger
 
 import com.felipelopes.cryptrade.domain.OrderSide
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.EnumType
 import jakarta.persistence.Enumerated
@@ -27,7 +28,10 @@ class Quote(
     @Enumerated(EnumType.STRING)
     val side: OrderSide,
 
+    @Column(precision = 28, scale = 8)
     val quantity: BigDecimal,
+
+    @Column(precision = 19, scale = 2)
     val price: BigDecimal,
     val expiresAt: Instant,
     val validatorSignature: String,

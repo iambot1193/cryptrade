@@ -1,5 +1,6 @@
 package com.felipelopes.cryptrade.ledger
 
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.Id
 import jakarta.persistence.Table
@@ -13,5 +14,6 @@ class Account(
     val address: String,
     val publicKey: String,
     var role: String = "USER",
+    @Column(precision = 19, scale = 2)
     var balance: BigDecimal = BigDecimal.ZERO
 )

@@ -1,6 +1,8 @@
 package com.felipelopes.cryptrade.ledger
 
 import com.felipelopes.cryptrade.domain.OrderSide
+import com.felipelopes.cryptrade.exception.InsufficientFundsException
+import com.felipelopes.cryptrade.exception.InsufficientPositionException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
@@ -108,9 +110,18 @@ class LedgerService(
                 val position = positionRepository.findByAddressAndSymbol(address, symbol)
                     ?: Position(address = address, symbol = symbol)
 
+                // Checagem de saldo/posicao mora aqui, nao so no service layer: isso roda dentro
+                // do synchronized+transacional do append(), entao e o unico lugar onde "ler saldo
+                // + decidir + gravar" e atomico. Um check antes de chamar append() sozinho tem
+                // TOCTOU - duas ordens concorrentes passariam no check antes de qualquer uma
+                // commitar e gastariam o mesmo saldo.
                 when (OrderSide.valueOf(side)) {
                     OrderSide.BUY -> {
-                        account.balance -= quantity * price
+                        val cost = quantity * price
+                        if (account.balance < cost) {
+                            throw InsufficientFundsException("saldo insuficiente: ${account.balance} < $cost")
+                        }
+                        account.balance -= cost
                         val totalCost = position.quantity * position.averagePrice + quantity * price
                         position.quantity += quantity
                         position.averagePrice = if (position.quantity.signum() != 0) {
@@ -120,6 +131,9 @@ class LedgerService(
                         }
                     }
                     OrderSide.SELL -> {
+                        if (position.quantity < quantity) {
+                            throw InsufficientPositionException("posicao insuficiente: ${position.quantity} < $quantity")
+                        }
                         account.balance += quantity * price
                         position.quantity -= quantity
                         if (position.quantity.signum() == 0) position.averagePrice = BigDecimal.ZERO
@@ -130,6 +144,69 @@ class LedgerService(
                 positionRepository.save(position)
             }
         }
+    }
+
+    data class ReplayResult(
+        val balances: Map<String, BigDecimal>,
+        val positions: Map<Pair<String, String>, Pair<BigDecimal, BigDecimal>>
+    )
+
+    /**
+     * Recomputa saldo/posicao do zero decodificando o log, sem tocar nas tabelas accounts/
+     * positions - prova que a projecao materializada bate com o que o log realmente contem.
+     * Duplica a logica de negocio do applyProjection de proposito: se comparasse contra si mesmo
+     * um bug ali nao apareceria aqui.
+     */
+    fun replay(): ReplayResult {
+        val balances = mutableMapOf<String, BigDecimal>()
+        val positions = mutableMapOf<Pair<String, String>, Pair<BigDecimal, BigDecimal>>()
+
+        for (block in blockRepository.findAllByOrderByBlockIndexAsc()) {
+            for (entry in entryRepository.findByBlockIndexOrderBySequenceInBlockAsc(block.blockIndex)) {
+                val decoded = CanonicalSerializer.decode(entry.payload)
+                val fields = decoded.subList(1, decoded.size - 3)
+
+                when (entry.type) {
+                    EntryType.CREATE_ACCOUNT -> {
+                        val (address, _) = fields
+                        balances.putIfAbsent(address, BigDecimal.ZERO)
+                    }
+                    EntryType.MINT -> {
+                        val (address, amount) = fields
+                        balances[address] = (balances[address] ?: BigDecimal.ZERO) + BigDecimal(amount)
+                    }
+                    EntryType.ORDER -> {
+                        val (address, symbol, side, quantityStr, priceStr) = fields
+                        val quantity = BigDecimal(quantityStr)
+                        val price = BigDecimal(priceStr)
+                        val key = address to symbol
+                        val (posQuantity, posAveragePrice) = positions[key] ?: (BigDecimal.ZERO to BigDecimal.ZERO)
+
+                        when (OrderSide.valueOf(side)) {
+                            OrderSide.BUY -> {
+                                balances[address] = (balances[address] ?: BigDecimal.ZERO) - quantity * price
+                                val totalCost = posQuantity * posAveragePrice + quantity * price
+                                val newQuantity = posQuantity + quantity
+                                val newAveragePrice = if (newQuantity.signum() != 0) {
+                                    totalCost.divide(newQuantity, 8, RoundingMode.HALF_UP)
+                                } else {
+                                    BigDecimal.ZERO
+                                }
+                                positions[key] = newQuantity to newAveragePrice
+                            }
+                            OrderSide.SELL -> {
+                                balances[address] = (balances[address] ?: BigDecimal.ZERO) + quantity * price
+                                val newQuantity = posQuantity - quantity
+                                val newAveragePrice = if (newQuantity.signum() == 0) BigDecimal.ZERO else posAveragePrice
+                                positions[key] = newQuantity to newAveragePrice
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return ReplayResult(balances, positions)
     }
 
     fun verify(): VerificationResult {

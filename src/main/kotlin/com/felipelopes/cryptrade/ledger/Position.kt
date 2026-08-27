@@ -1,5 +1,6 @@
 package com.felipelopes.cryptrade.ledger
 
+import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
@@ -17,6 +18,10 @@ class Position(
 
     val address: String,
     val symbol: String,
+
+    @Column(precision = 28, scale = 8)
     var quantity: BigDecimal = BigDecimal.ZERO,
+
+    @Column(precision = 19, scale = 2)
     var averagePrice: BigDecimal = BigDecimal.ZERO
 )

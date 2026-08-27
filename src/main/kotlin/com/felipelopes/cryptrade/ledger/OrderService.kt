@@ -23,7 +23,11 @@ class OrderService(
     private val priceProvider: PriceProvider,
     private val rateLimiter: RateLimiter
 ) {
-    @Transactional
+    // Sem @Transactional aqui de proposito: ledgerService.append() ja e a fronteira transacional
+    // (synchronized + TransactionTemplate cobrindo o commit). Se este metodo fosse @Transactional,
+    // o append() so juntaria a transacao ja aberta em vez de commitar a sua propria, e o lock
+    // liberaria ANTES do commit real - duas ordens concorrentes veriam saldo desatualizado uma da
+    // outra e dava pra gastar o mesmo saldo duas vezes.
     fun placeOrder(address: String, quoteId: String, signatureBase64: String): LedgerBlock {
         if (!rateLimiter.allow("order:$address", MAX_ORDERS_PER_MIN, Duration.ofMinutes(1))) {
             throw RateLimitedException("muitas ordens, tente de novo em instantes")
@@ -60,6 +64,10 @@ class OrderService(
             throw QuoteExpiredException("cotacao $quoteId expirou")
         }
 
+        // Fast-path best-effort: evita queimar o quoteId (uso unico) num request obviamente ruim.
+        // Nao e a garantia - essa e o mesmo check dentro de LedgerService.applyProjection, que
+        // roda sob o lock de append() e e o unico lugar onde "ler saldo + decidir + gravar" e
+        // atomico de verdade.
         when (quote.side) {
             OrderSide.BUY -> {
                 val cost = quote.quantity * quote.price
@@ -104,7 +112,9 @@ class OrderService(
     fun portfolio(address: String): PortfolioResponse {
         val account = accountRepository.findById(address)
             .orElseThrow { AccountNotFoundException("conta $address nao encontrada") }
-        val positions = positionRepository.findByAddress(address).map { position ->
+        val positions = positionRepository.findByAddress(address)
+            .filter { it.quantity.signum() != 0 }
+            .map { position ->
             val currentPrice = priceProvider.currentPrice(position.symbol)
             PositionResponse.from(position, currentPrice)
         }
