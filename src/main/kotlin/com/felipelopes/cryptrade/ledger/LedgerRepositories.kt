@@ -16,6 +16,7 @@ interface LedgerBlockRepository : JpaRepository<LedgerBlock, Long> {
 
 interface LedgerEntryRepository : JpaRepository<LedgerEntry, Long> {
     fun findByBlockIndexOrderBySequenceInBlockAsc(blockIndex: Long): List<LedgerEntry>
+    fun findByQuoteId(quoteId: String): LedgerEntry?
 }
 
 interface QuoteRepository : JpaRepository<Quote, String>

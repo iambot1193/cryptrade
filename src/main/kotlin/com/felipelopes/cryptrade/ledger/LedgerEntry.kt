@@ -27,6 +27,11 @@ class LedgerEntry(
     @Column(length = 4000)
     val payload: ByteArray,
 
+    // unico: uma cotacao gera no maximo um lancamento no ledger. E o que impede duas
+    // requisicoes concorrentes com o mesmo quoteId de executarem as duas - o segundo append
+    // falha aqui e faz rollback da transacao inteira. NULL (CREATE_ACCOUNT/MINT) e distinto
+    // em unique tanto no H2 quanto no Postgres, entao multiplos entries sem quoteId convivem.
+    @Column(unique = true)
     val quoteId: String? = null,
     val authorAddress: String? = null,
     val signature: String

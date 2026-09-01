@@ -6,6 +6,7 @@ import com.felipelopes.cryptrade.dto.PositionResponse
 import com.felipelopes.cryptrade.exception.InsufficientFundsException
 import com.felipelopes.cryptrade.exception.InsufficientPositionException
 import com.felipelopes.cryptrade.service.PriceProvider
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -17,6 +18,7 @@ import java.util.Base64
 class OrderService(
     private val ledgerService: LedgerService,
     private val ledgerBlockRepository: LedgerBlockRepository,
+    private val ledgerEntryRepository: LedgerEntryRepository,
     private val quoteRepository: QuoteRepository,
     private val accountRepository: AccountRepository,
     private val positionRepository: PositionRepository,
@@ -83,25 +85,34 @@ class OrderService(
             }
         }
 
-        val block = ledgerService.append(
-            listOf(
-                LedgerService.PendingEntry(
-                    type = EntryType.ORDER,
-                    fields = listOf(
-                        address,
-                        quote.symbol,
-                        quote.side.name,
-                        CanonicalSerializer.decimalField(quote.quantity, 8),
-                        CanonicalSerializer.decimalField(quote.price, 2)
-                    ),
-                    quoteId = quoteId,
-                    authorAddress = address,
-                    signature = signatureBase64
+        val block = try {
+            ledgerService.append(
+                listOf(
+                    LedgerService.PendingEntry(
+                        type = EntryType.ORDER,
+                        fields = listOf(
+                            address,
+                            quote.symbol,
+                            quote.side.name,
+                            CanonicalSerializer.decimalField(quote.quantity, 8),
+                            CanonicalSerializer.decimalField(quote.price, 2)
+                        ),
+                        quoteId = quoteId,
+                        authorAddress = address,
+                        signature = signatureBase64
+                    )
                 )
             )
-        )
+        } catch (e: DataIntegrityViolationException) {
+            // Corrida perdida: outra requisicao concorrente com o mesmo quoteId ja gravou o
+            // lancamento, e o indice unico em ledger_entries.quote_id recusou este. A transacao
+            // deste append (incluindo a projecao de saldo) foi revertida - nada foi gasto duas
+            // vezes. Devolve o bloco que a outra requisicao gerou.
+            val existing = ledgerEntryRepository.findByQuoteId(quoteId)
+                ?: throw e
+            return ledgerBlockRepository.findById(existing.blockIndex).orElseThrow()
+        }
 
-        quote.usedAt = Instant.now()
         quote.resultBlockIndex = block.blockIndex
         quoteRepository.save(quote)
 

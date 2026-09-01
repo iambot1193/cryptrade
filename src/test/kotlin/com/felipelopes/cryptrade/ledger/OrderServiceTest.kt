@@ -31,6 +31,9 @@ class OrderServiceTest {
     @Autowired
     lateinit var accountRepository: AccountRepository
 
+    @Autowired
+    lateinit var positionRepository: PositionRepository
+
     private fun createFundedAccount(): Pair<String, PrivateKey> {
         val keyPair = SignatureVerifier.generateKeyPair()
         val publicKeyBase64 = TestClientKeys.rawPublicKeyBase64(keyPair)
@@ -139,5 +142,31 @@ class OrderServiceTest {
         val account = accountRepository.findById(address).orElseThrow()
         assertTrue(account.balance.signum() >= 0)
         assertMoneyEquals(BigDecimal("25000.00"), account.balance)
+    }
+
+    @Test
+    fun `same quoteId submitted concurrently executes only once`() {
+        val (address, privateKey) = createFundedAccount()
+        val quote = quoteService.createQuote(address, "bitcoin", OrderSide.BUY, BigDecimal("0.1"))
+        val signature = signOrder(privateKey, quote)
+
+        val barrier = CyclicBarrier(2)
+        val executor = Executors.newFixedThreadPool(2)
+        val tasks = listOf(
+            Callable { barrier.await(); orderService.placeOrder(address, quote.quoteId, signature) },
+            Callable { barrier.await(); orderService.placeOrder(address, quote.quoteId, signature) }
+        )
+        val outcomes = executor.invokeAll(tasks).map { runCatching { it.get() } }
+        executor.shutdown()
+
+        // as duas requisicoes voltam com sucesso, apontando pro MESMO bloco - a perdedora pega
+        // o bloco da vencedora via findByQuoteId em vez de executar a ordem de novo.
+        assertTrue(outcomes.all { it.isSuccess }, "ambas deviam devolver o mesmo bloco: $outcomes")
+        assertEquals(1, outcomes.map { it.getOrThrow().blockIndex }.distinct().size)
+
+        // 0.1 BTC a 50000 = 5000 debitado UMA vez.
+        val account = accountRepository.findById(address).orElseThrow()
+        assertMoneyEquals(BigDecimal("95000.00"), account.balance)
+        assertMoneyEquals(BigDecimal("0.1"), positionRepository.findByAddressAndSymbol(address, "bitcoin")!!.quantity)
     }
 }
