@@ -12,6 +12,8 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+  cache:
+    type: none
 
 cryptrade:
   account:
