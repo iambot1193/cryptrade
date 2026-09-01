@@ -18,21 +18,26 @@ class AuthService(
     data class TokenPair(val accessToken: String, val refreshToken: String, val expiresAt: Instant)
 
     fun issueChallenge(address: String): Pair<String, Instant> {
-        if (!rateLimiter.allow("challenge:$address", MAX_CHALLENGE_PER_MIN, Duration.ofMinutes(1))) {
-            throw RateLimitedException("muitos pedidos de challenge, tente de novo em instantes")
-        }
+        // Checa a conta ANTES do rate limiter: senao um address arbitrario (nao ha conta pra
+        // ele) cria uma chave nova no mapa em memoria do limiter a cada request e o mapa cresce
+        // sem limite. Com a ordem invertida, so addresses de contas reais viram chave.
         if (!accountRepository.existsById(address)) {
             throw AccountNotFoundException("conta $address nao encontrada")
+        }
+        if (!rateLimiter.allow("challenge:$address", MAX_CHALLENGE_PER_MIN, Duration.ofMinutes(1))) {
+            throw RateLimitedException("muitos pedidos de challenge, tente de novo em instantes")
         }
         return challengeStore.issue(address)
     }
 
     fun verify(address: String, signatureBase64: String): TokenPair {
+        // Conta antes do rate limiter, mesmo motivo do issueChallenge: nao deixar address
+        // desconhecido criar chave no mapa do limiter.
+        val account = accountRepository.findById(address)
+            .orElseThrow { AccountNotFoundException("conta $address nao encontrada") }
         if (!rateLimiter.allow("verify:$address", MAX_VERIFY_PER_MIN, Duration.ofMinutes(1))) {
             throw RateLimitedException("muitas tentativas de login, tente de novo em instantes")
         }
-        val account = accountRepository.findById(address)
-            .orElseThrow { AccountNotFoundException("conta $address nao encontrada") }
 
         val nonce = challengeStore.peek(address) ?: run {
             audit(address, "login_failed", "challenge ausente ou expirado")
