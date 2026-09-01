@@ -1,7 +1,8 @@
 package com.felipelopes.cryptrade.ledger
 
 import com.felipelopes.cryptrade.domain.OrderSide
-import com.felipelopes.cryptrade.service.PriceProvider
+import com.felipelopes.cryptrade.service.PriceService
+import com.felipelopes.cryptrade.service.TickerRegistry
 import org.springframework.stereotype.Service
 import java.math.BigDecimal
 import java.time.Duration
@@ -15,7 +16,7 @@ import java.util.UUID
  */
 @Service
 class QuoteService(
-    private val priceProvider: PriceProvider,
+    private val priceService: PriceService,
     private val quoteRepository: QuoteRepository,
     private val validatorKeys: ValidatorKeyProvider,
     private val rateLimiter: RateLimiter
@@ -25,14 +26,17 @@ class QuoteService(
             throw RateLimitedException("muitos pedidos de cotacao, tente de novo em instantes")
         }
 
-        val price = priceProvider.currentPrice(symbol)
+        // canonicaliza aqui: a Quote guarda "bitcoin" mesmo se o cliente pediu "BTC", entao a
+        // ordem que executa contra ela e o replay do ledger veem sempre o mesmo simbolo.
+        val coinId = TickerRegistry.resolve(symbol)
+        val price = priceService.currentPrice(coinId)
         val quoteId = UUID.randomUUID().toString()
         val expiresAt = Instant.now().plus(QUOTE_TTL)
 
         val fields = listOf(
             quoteId,
             address,
-            symbol,
+            coinId,
             side.name,
             CanonicalSerializer.decimalField(quantity, 8),
             CanonicalSerializer.decimalField(price, 2),
@@ -46,7 +50,7 @@ class QuoteService(
             Quote(
                 quoteId = quoteId,
                 address = address,
-                symbol = symbol,
+                symbol = coinId,
                 side = side,
                 quantity = quantity,
                 price = price,
