@@ -41,7 +41,7 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-resttestclient")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testImplementation("org.mockito:mockito-core")
-	testImplementation("org.mockito.kotlin:mockito-kotlin:5.4.0")
+	testImplementation("org.mockito.kotlin:mockito-kotlin:6.3.0")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("org.testcontainers:junit-jupiter:1.20.4")
 	testImplementation("org.testcontainers:postgresql:1.20.4")
