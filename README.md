@@ -105,26 +105,27 @@ onde ler, decidir e gravar é atômico de verdade.
 
 Cada chamada revalida a **cadeia inteira** do genesis até a ponta — para cada bloco: confere o
 `prevHash`, recalcula o hash a partir dos entries e do timestamp, e verifica a assinatura Ed25519
-do validador. É `O(n)` em blocos, sem cache e sem paginação.
+do validador. É `O(n)` em blocos a cada chamada, de propósito: recalcular do zero é o que dá a
+garantia total.
 
-Isso é deliberado: recalcular do zero é o que dá a garantia total. Um checkpoint "confie até o
-bloco X" só valeria se o próprio checkpoint fosse assinado e guardado **fora** do banco que a
-verificação existe para auditar — senão quem adultera o histórico adultera o checkpoint junto.
+**Por que não memoizar.** A tentação óbvia — cachear o `VerificationResult` e invalidar quando
+um bloco novo é anexado — é *insegura* aqui. O ataque que `verify()` existe para pegar é editar
+uma linha no meio do histórico direto no banco; isso deixa a ponta (último bloco, contagem)
+intacta, então qualquer chave de cache barata devolveria o resultado antigo "válido". Um cache
+só seria seguro com a chave cobrindo os bytes de **todos** os blocos — o que custa quase o mesmo
+que a verificação. Então não tem cache.
 
-**Tem resolução, em ordem de esforço:**
+**O que existe:** o endpoint é **rate-limited** (60/min, chave global — não tem auth) via o
+mesmo `RateLimiter` de login/cotação/ordem. Impede que uma chamada em loop custe CPU
+proporcional ao tamanho do histórico.
 
-1. **Memoizar por hash da ponta** — guardar o último `VerificationResult` + o hash do último
-   bloco; invalidar no `append()`. Chamada sem bloco novo desde a última verificação vira `O(1)`.
-   É o passo barato e cobre o caso comum (dashboard fazendo polling).
-2. **Verificação de sufixo** — `/ledger/verify?from=N` revalida só de `N` em diante, tratando o
-   hash de `N-1` como âncora confiável. Útil quando já se verificou o começo antes.
-3. **Checkpoint assinado + âncora externa** — publicar periodicamente o hash da ponta em outro
+**Escala real, se a corrente crescer muito:**
+
+1. **Verificação de sufixo** — `/ledger/verify?from=N` revalida só de `N` em diante, tratando o
+   hash de `N-1` como âncora confiável (obtida de uma verificação completa anterior).
+2. **Checkpoint assinado + âncora externa** — publicar periodicamente o hash da ponta em outro
    sistema (outro serviço, um log público) e verificar só o trecho desde o último checkpoint
    ancorado. É o que um ledger de produção faria.
-
-Enquanto nada disso existe, o endpoint **não tem rate limit** — o `RateLimiter` já está no
-projeto (usado em login/cotação/ordem); plugá-lo em `/ledger/verify` é a mitigação imediata
-contra uma chamada em loop custar CPU proporcional ao tamanho do histórico.
 
 ## Endpoints
 
@@ -139,7 +140,7 @@ contra uma chamada em loop custar CPU proporcional ao tamanho do histórico.
 | `POST` | `/api/orders` | Bearer | `{ quoteId, signature }` → executa a ordem, retorna o bloco |
 | `GET` | `/api/portfolio` | Bearer | Saldo, posições e equity da conta autenticada |
 | `GET` | `/api/prices/{symbol}` | — | Preço atual; aceita ticker (`BTC`) ou id CoinGecko (`bitcoin`) |
-| `GET` | `/ledger/verify` | — | Recalcula o encadeamento de hash e confere assinaturas |
+| `GET` | `/ledger/verify` | — | Recalcula o encadeamento de hash e confere assinaturas (rate-limited, 60/min) |
 | `GET` | `/admin/audit` | Bearer (ADMIN) | Login falho, assinatura rejeitada, cotação expirada |
 | `GET` | `/swagger-ui.html` | — | Swagger UI (spec em `/v3/api-docs`) |
 | `GET` | `/actuator/health` `/info` `/metrics` | — | Health, build-info e métricas |
