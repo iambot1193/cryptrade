@@ -11,6 +11,7 @@ import java.io.ByteArrayOutputStream
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.Base64
@@ -28,6 +29,7 @@ class LedgerService(
     private val accountRepository: AccountRepository,
     private val positionRepository: PositionRepository,
     private val validatorKeys: ValidatorKeyProvider,
+    private val rateLimiter: RateLimiter,
     transactionManager: PlatformTransactionManager
 ) {
     data class PendingEntry(
@@ -219,7 +221,26 @@ class LedgerService(
         return ReplayResult(balances, positions)
     }
 
+    /**
+     * Revalida a cadeia inteira do genesis ate a ponta: prevHash encadeado, hash recalculado e
+     * assinatura do validador de CADA bloco. E O(n) em blocos a cada chamada, de proposito -
+     * recalcular do zero e o que da a garantia total.
+     *
+     * Nao ha memoizacao: uma chave de cache barata (hash da ponta, contagem de blocos) NAO
+     * detecta adulteracao de um bloco no meio - editar o payload da linha K no banco deixa a
+     * ponta intacta, e verify() so pega isso recomputando. Um cache so seria seguro com chave
+     * cobrindo os bytes de todos os blocos, o que custa quase o mesmo que a verificacao.
+     *
+     * ponytail: rate-limited (RateLimiter, chave global - endpoint sem auth) pra uma chamada em
+     * loop nao custar CPU proporcional ao historico. Escala real, se a corrente crescer:
+     * /ledger/verify?from=N revalidando so o sufixo a partir de um hash-ancora confiavel, ou
+     * checkpoint assinado + ancora publicada fora deste banco.
+     */
     fun verify(): VerificationResult {
+        if (!rateLimiter.allow("ledger-verify", MAX_VERIFY_PER_MIN, Duration.ofMinutes(1))) {
+            throw RateLimitedException("verificacao do ledger esta limitada, tente de novo em instantes")
+        }
+
         var expectedPrevHash = GENESIS_HASH
         for (block in blockRepository.findAllByOrderByBlockIndexAsc()) {
             if (block.prevHash != expectedPrevHash) {
@@ -265,5 +286,9 @@ class LedgerService(
 
     companion object {
         val GENESIS_HASH = "0".repeat(64)
+
+        // ponytail: 60/min = 1/s sustentado, folgado pra um dashboard fazendo polling e ainda
+        // corta um loop apertado. Vira propriedade se a demo precisar de outro valor.
+        private const val MAX_VERIFY_PER_MIN = 60
     }
 }

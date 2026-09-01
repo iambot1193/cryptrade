@@ -101,6 +101,32 @@ liam o mesmo saldo desatualizado e as duas passavam. O teste de concorrência
 a checagem de saldo/posição pra dentro do `applyProjection`, que roda sob o lock — o único lugar
 onde ler, decidir e gravar é atômico de verdade.
 
+### Custo do `/ledger/verify`
+
+Cada chamada revalida a **cadeia inteira** do genesis até a ponta — para cada bloco: confere o
+`prevHash`, recalcula o hash a partir dos entries e do timestamp, e verifica a assinatura Ed25519
+do validador. É `O(n)` em blocos a cada chamada, de propósito: recalcular do zero é o que dá a
+garantia total.
+
+**Por que não memoizar.** A tentação óbvia — cachear o `VerificationResult` e invalidar quando
+um bloco novo é anexado — é *insegura* aqui. O ataque que `verify()` existe para pegar é editar
+uma linha no meio do histórico direto no banco; isso deixa a ponta (último bloco, contagem)
+intacta, então qualquer chave de cache barata devolveria o resultado antigo "válido". Um cache
+só seria seguro com a chave cobrindo os bytes de **todos** os blocos — o que custa quase o mesmo
+que a verificação. Então não tem cache.
+
+**O que existe:** o endpoint é **rate-limited** (60/min, chave global — não tem auth) via o
+mesmo `RateLimiter` de login/cotação/ordem. Impede que uma chamada em loop custe CPU
+proporcional ao tamanho do histórico.
+
+**Escala real, se a corrente crescer muito:**
+
+1. **Verificação de sufixo** — `/ledger/verify?from=N` revalida só de `N` em diante, tratando o
+   hash de `N-1` como âncora confiável (obtida de uma verificação completa anterior).
+2. **Checkpoint assinado + âncora externa** — publicar periodicamente o hash da ponta em outro
+   sistema (outro serviço, um log público) e verificar só o trecho desde o último checkpoint
+   ancorado. É o que um ledger de produção faria.
+
 ## Endpoints
 
 | Método | Rota | Auth | Descrição |
@@ -114,7 +140,7 @@ onde ler, decidir e gravar é atômico de verdade.
 | `POST` | `/api/orders` | Bearer | `{ quoteId, signature }` → executa a ordem, retorna o bloco |
 | `GET` | `/api/portfolio` | Bearer | Saldo, posições e equity da conta autenticada |
 | `GET` | `/api/prices/{symbol}` | — | Preço atual; aceita ticker (`BTC`) ou id CoinGecko (`bitcoin`) |
-| `GET` | `/ledger/verify` | — | Recalcula o encadeamento de hash e confere assinaturas |
+| `GET` | `/ledger/verify` | — | Recalcula o encadeamento de hash e confere assinaturas (rate-limited, 60/min) |
 | `GET` | `/admin/audit` | Bearer (ADMIN) | Login falho, assinatura rejeitada, cotação expirada |
 | `GET` | `/swagger-ui.html` | — | Swagger UI (spec em `/v3/api-docs`) |
 | `GET` | `/actuator/health` `/info` `/metrics` | — | Health, build-info e métricas |
