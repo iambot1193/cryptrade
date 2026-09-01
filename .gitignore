@@ -39,6 +39,9 @@ out/
 ### Kotlin ###
 .kotlin
 
+### Logs ###
+logs/
+
 ### Env ###
 .env
 
