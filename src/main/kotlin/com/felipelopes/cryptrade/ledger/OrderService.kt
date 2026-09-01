@@ -5,7 +5,7 @@ import com.felipelopes.cryptrade.dto.PortfolioResponse
 import com.felipelopes.cryptrade.dto.PositionResponse
 import com.felipelopes.cryptrade.exception.InsufficientFundsException
 import com.felipelopes.cryptrade.exception.InsufficientPositionException
-import com.felipelopes.cryptrade.service.PriceProvider
+import com.felipelopes.cryptrade.service.PriceService
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,7 +22,7 @@ class OrderService(
     private val quoteRepository: QuoteRepository,
     private val accountRepository: AccountRepository,
     private val positionRepository: PositionRepository,
-    private val priceProvider: PriceProvider,
+    private val priceService: PriceService,
     private val rateLimiter: RateLimiter
 ) {
     // Sem @Transactional aqui de proposito: ledgerService.append() ja e a fronteira transacional
@@ -126,7 +126,7 @@ class OrderService(
         val positions = positionRepository.findByAddress(address)
             .filter { it.quantity.signum() != 0 }
             .map { position ->
-            val currentPrice = priceProvider.currentPrice(position.symbol)
+            val currentPrice = priceService.currentPrice(position.symbol)
             PositionResponse.from(position, currentPrice)
         }
         val totalEquity = account.balance + positions.sumOf { it.marketValue }

@@ -113,17 +113,21 @@ onde ler, decidir e gravar é atômico de verdade.
 | `POST` | `/quotes` | Bearer | `{ symbol, side, quantity }` → cotação assinada, válida por 30s |
 | `POST` | `/api/orders` | Bearer | `{ quoteId, signature }` → executa a ordem, retorna o bloco |
 | `GET` | `/api/portfolio` | Bearer | Saldo, posições e equity da conta autenticada |
-| `GET` | `/api/prices/{symbol}` | — | Preço atual (`bitcoin`, `ethereum`, `solana`) |
+| `GET` | `/api/prices/{symbol}` | — | Preço atual; aceita ticker (`BTC`) ou id CoinGecko (`bitcoin`) |
 | `GET` | `/ledger/verify` | — | Recalcula o encadeamento de hash e confere assinaturas |
 | `GET` | `/admin/audit` | Bearer (ADMIN) | Login falho, assinatura rejeitada, cotação expirada |
+| `GET` | `/swagger-ui.html` | — | Swagger UI (spec em `/v3/api-docs`) |
+| `GET` | `/actuator/health` `/info` `/metrics` | — | Health, build-info e métricas |
 
 ## Stack
 
-- Kotlin + Spring Boot 4 (Web MVC, Data JPA, Validation)
+- Kotlin + Spring Boot 4 (Web MVC, Data JPA, Validation, Actuator)
 - Postgres + Flyway (H2 em memória só no perfil de teste)
 - Ed25519 nativo do JDK (`java.security.Signature`, sem Bouncy Castle) + tweetnacl-js no cliente
 - Gradle (Kotlin DSL)
-- Preço de mercado: [CoinGecko API](https://www.coingecko.com/en/api) (pública, sem chave)
+- Preço de mercado: [CoinGecko API](https://www.coingecko.com/en/api) (pública, sem chave), com cache Caffeine (30s)
+- springdoc-openapi (Swagger UI), logging estruturado ECS em arquivo (`logs/cryptrade.json`)
+- Dependabot + CodeQL no CI
 
 ### Perfis
 
@@ -165,19 +169,33 @@ Os cinco testes que sustentam o pitch (em `ledger/`):
 | `OrderServiceTest.same quoteId submitted twice executes only once` | Idempotência: retry do mesmo `quoteId` não duplica a execução |
 | `LedgerHttpFlowTest` | Fluxo HTTP completo: criar conta → login → cotação → ordem assinada |
 
+## Carga (k6)
+
+`k6/load-test.js` bate no caminho de leitura (`/api/prices/bitcoin`, `/ledger/verify`,
+`/actuator/health`) com 50 VUs por 2 min. Thresholds: `http_req_failed < 1%`,
+`p(95) < 200ms`, `p(99) < 500ms`.
+
+```bash
+docker compose up -d
+k6 run k6/load-test.js
+```
+
 ## Estrutura do projeto
 
 ```
 src/main/kotlin/com/felipelopes/cryptrade/
 ├── CryptradeApplication.kt
 ├── config/
-│   └── RestClientConfig.kt          # bean do RestClient para a CoinGecko
+│   ├── RestClientConfig.kt          # bean do RestClient para a CoinGecko
+│   ├── CacheConfig.kt               # @EnableCaching (spec Caffeine no application.yml)
+│   └── OpenApiConfig.kt             # metadados da spec OpenAPI
 ├── controller/
 │   └── PriceController.kt           # GET /api/prices/{symbol}
 ├── domain/
 │   └── OrderSide.kt                 # enum BUY/SELL, compartilhado
 ├── service/
-│   ├── PriceService.kt / PriceProvider.kt
+│   ├── PriceService.kt / PriceProvider.kt   # PriceService: resolve ticker + @Cacheable
+│   ├── TickerRegistry.kt            # BTC -> bitcoin
 │   ├── CoinGeckoPriceProvider.kt    # perfil padrão
 │   └── FakePriceProvider.kt         # perfis test e demo
 ├── dto/                             # request/response, isolam a entidade da API
