@@ -101,6 +101,31 @@ liam o mesmo saldo desatualizado e as duas passavam. O teste de concorrência
 a checagem de saldo/posição pra dentro do `applyProjection`, que roda sob o lock — o único lugar
 onde ler, decidir e gravar é atômico de verdade.
 
+### Custo do `/ledger/verify`
+
+Cada chamada revalida a **cadeia inteira** do genesis até a ponta — para cada bloco: confere o
+`prevHash`, recalcula o hash a partir dos entries e do timestamp, e verifica a assinatura Ed25519
+do validador. É `O(n)` em blocos, sem cache e sem paginação.
+
+Isso é deliberado: recalcular do zero é o que dá a garantia total. Um checkpoint "confie até o
+bloco X" só valeria se o próprio checkpoint fosse assinado e guardado **fora** do banco que a
+verificação existe para auditar — senão quem adultera o histórico adultera o checkpoint junto.
+
+**Tem resolução, em ordem de esforço:**
+
+1. **Memoizar por hash da ponta** — guardar o último `VerificationResult` + o hash do último
+   bloco; invalidar no `append()`. Chamada sem bloco novo desde a última verificação vira `O(1)`.
+   É o passo barato e cobre o caso comum (dashboard fazendo polling).
+2. **Verificação de sufixo** — `/ledger/verify?from=N` revalida só de `N` em diante, tratando o
+   hash de `N-1` como âncora confiável. Útil quando já se verificou o começo antes.
+3. **Checkpoint assinado + âncora externa** — publicar periodicamente o hash da ponta em outro
+   sistema (outro serviço, um log público) e verificar só o trecho desde o último checkpoint
+   ancorado. É o que um ledger de produção faria.
+
+Enquanto nada disso existe, o endpoint **não tem rate limit** — o `RateLimiter` já está no
+projeto (usado em login/cotação/ordem); plugá-lo em `/ledger/verify` é a mitigação imediata
+contra uma chamada em loop custar CPU proporcional ao tamanho do histórico.
+
 ## Endpoints
 
 | Método | Rota | Auth | Descrição |

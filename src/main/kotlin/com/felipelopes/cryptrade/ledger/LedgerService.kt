@@ -219,6 +219,20 @@ class LedgerService(
         return ReplayResult(balances, positions)
     }
 
+    /**
+     * Revalida a cadeia inteira do genesis ate a ponta: prevHash encadeado, hash recalculado e
+     * assinatura do validador de CADA bloco. E O(n) em blocos a cada chamada, de proposito - um
+     * checkpoint "confie ate o bloco X" so seria confiavel se o proprio checkpoint fosse
+     * assinado e guardado fora do mesmo banco que a chamada existe pra auditar; recalcular do
+     * zero e o que da a garantia total.
+     *
+     * ponytail: sem cache e sem paginacao. Corrente curta (demo/portfolio) aguenta. Caminhos de
+     * escala, em ordem de esforco: (1) memoizar o resultado por hash da ponta e invalidar no
+     * append - chamadas sem novo bloco viram O(1); (2) /ledger/verify?from=N revalidando so o
+     * sufixo, dado que o hash de N-1 e um ancora confiavel; (3) checkpoint assinado + ancora
+     * externa (outro servico, ou um hash publicado). Ate la o endpoint NAO tem rate limit -
+     * ligar o RateLimiter aqui e a mitigacao imediata contra abuso.
+     */
     fun verify(): VerificationResult {
         var expectedPrevHash = GENESIS_HASH
         for (block in blockRepository.findAllByOrderByBlockIndexAsc()) {
