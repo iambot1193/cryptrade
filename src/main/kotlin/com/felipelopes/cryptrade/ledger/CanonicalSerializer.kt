@@ -8,7 +8,7 @@ import java.security.MessageDigest
 /**
  * Bytes deterministicos pra assinatura/hash: campos concatenados com prefixo de tamanho
  * (4 bytes big-endian) + UTF-8. JSON nao garante isso entre linguagens (ordem de chave,
- * formato de decimal) - ver plan.md "Riscos conhecidos".
+ * formato de decimal).
  */
 object CanonicalSerializer {
 

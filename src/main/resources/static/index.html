@@ -259,7 +259,7 @@ function base64ToBytes(b64) {
 
 // --- serializacao canonica: espelha CanonicalSerializer.kt campo a campo -
 // prefixo de 4 bytes big-endian com o tamanho + UTF-8, concatenados. Mesma entrada,
-// mesmo hash nos dois lados (ver plan.md "Riscos conhecidos"). ---
+// mesmo hash nos dois lados. ---
 function canonicalize(fields) {
   const encoder = new TextEncoder();
   const encodedFields = fields.map(f => encoder.encode(f));

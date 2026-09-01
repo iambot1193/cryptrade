@@ -10,8 +10,8 @@ import java.util.Base64
 import java.util.UUID
 
 /**
- * Cliente nao define preco (plan.md "Cotacao + ordem") - servidor busca, assina, e so essa
- * assinatura e o preco final que a ordem executa contra.
+ * Cliente nao define preco - servidor busca, assina, e so essa assinatura e o preco final
+ * que a ordem executa contra.
  */
 @Service
 class QuoteService(

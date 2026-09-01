@@ -8,7 +8,7 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Nonce de login por address, em memoria - single-node (ver plan.md), TTL curto o suficiente
+ * Nonce de login por address, em memoria - single-node, TTL curto o suficiente
  * pra nao precisar sobreviver restart. Um pending challenge por address (o novo substitui o
  * anterior).
  */

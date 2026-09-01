@@ -16,7 +16,7 @@ class AccountService(
     @Value("\${cryptrade.admin.address:}") private val adminAddress: String
 ) {
     /**
-     * Endereco = hash da chave publica (plan.md). Signature prova posse da privada - sem isso
+     * Endereco = hash da chave publica. Signature prova posse da privada - sem isso
      * qualquer um poderia registrar conta em nome de uma chave publica que nao controla.
      */
     fun createAccount(publicKeyBase64: String, signatureBase64: String): Account {
