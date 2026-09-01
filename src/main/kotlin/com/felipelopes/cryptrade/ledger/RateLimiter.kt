@@ -5,7 +5,7 @@ import java.time.Duration
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
 
-// ponytail: janela deslizante em memoria, por instancia - single node (plan.md), sem Redis.
+// ponytail: janela deslizante em memoria, por instancia - single node, sem Redis.
 // Se escalar horizontalmente, precisa de um limiter compartilhado.
 @Component
 class RateLimiter {

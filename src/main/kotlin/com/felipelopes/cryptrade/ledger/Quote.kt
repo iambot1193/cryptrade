@@ -11,8 +11,8 @@ import java.math.BigDecimal
 import java.time.Instant
 
 /**
- * Preco emitido e assinado pelo validador, com validade curta. Cliente nao define preco (ver
- * plan.md "Cotacao + ordem") - so assina { quoteId, quantity } por cima do que o servidor propos.
+ * Preco emitido e assinado pelo validador, com validade curta. Cliente nao define preco - so
+ * assina { quoteId, quantity } por cima do que o servidor propos.
  * quoteId dobra de chave de idempotencia: resultBlockIndex faz o reenvio do mesmo quoteId
  * devolver o bloco anterior em vez de executar de novo; o indice unico em
  * ledger_entries.quote_id fecha a corrida quando dois reenvios chegam concorrentes.

@@ -27,7 +27,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Item 23 do plan.md: fluxo completo via HTTP, do jeito que um cliente de verdade bateria -
+ * Fluxo completo via HTTP, do jeito que um cliente de verdade bateria -
  * criar conta -> challenge -> login -> cotacao -> ordem assinada -> portfolio.
  */
 // Contexto proprio (webEnvironment=RANDOM_PORT) -> ValidatorKeyProvider efemero proprio, diferente
