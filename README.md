@@ -197,7 +197,7 @@ src/main/kotlin/com/felipelopes/cryptrade/
     └── *Controller.kt                # camada HTTP
 
 src/main/resources/
-├── db/migration/                    # V1 esqueleto -> V2 ledger -> V3 contas/ordens/cleanup
+├── db/migration/                    # V1 esqueleto -> V2 ledger -> V3 contas/ordens -> V4 cotacao uso unico
 └── static/index.html                # cliente de referencia (tweetnacl-js)
 ```
 
@@ -205,7 +205,6 @@ src/main/resources/
 
 PoW/consenso multi-nó, secp256k1/carteiras Ethereum reais, custódia de chave privada no
 servidor, máquina de estados de ordem (a execução é síncrona, sem mempool), Prometheus/Grafana.
-Ver `plan.md` (local, não versionado) pra decisões completas e o roadmap de bônus.
 
 ## Licença
 
