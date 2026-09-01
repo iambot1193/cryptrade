@@ -3,6 +3,7 @@ package com.felipelopes.cryptrade.ledger
 import com.felipelopes.cryptrade.domain.OrderSide
 import com.felipelopes.cryptrade.exception.InsufficientFundsException
 import com.felipelopes.cryptrade.exception.InsufficientPositionException
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
@@ -37,6 +38,7 @@ class LedgerService(
         val signature: String
     )
 
+    private val log = LoggerFactory.getLogger(LedgerService::class.java)
     private val appendLock = Any()
     private val transactionTemplate = TransactionTemplate(transactionManager)
 
@@ -86,6 +88,14 @@ class LedgerService(
             )
             applyProjection(pending)
         }
+
+        log.atInfo()
+            .addKeyValue("event", "ledger_block_appended")
+            .addKeyValue("blockIndex", block.blockIndex)
+            .addKeyValue("entryCount", entries.size)
+            .addKeyValue("entryTypes", entries.joinToString(",") { it.type.name })
+            .setMessage("bloco anexado ao ledger")
+            .log()
 
         return block
     }

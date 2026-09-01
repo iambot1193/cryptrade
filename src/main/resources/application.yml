@@ -26,3 +26,26 @@ cryptrade:
     address: ${CRYPTRADE_ADMIN_ADDRESS:}
   auth:
     jwt-secret-base64: ${CRYPTRADE_JWT_SECRET:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+logging:
+  # console fica legivel (a demo do README depende disso); o JSON estruturado vai pro arquivo.
+  file:
+    name: logs/cryptrade.json
+  structured:
+    format:
+      file: ecs
+    ecs:
+      service:
+        name: cryptrade
