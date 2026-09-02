@@ -22,6 +22,8 @@ Abra `http://localhost:8080` — é o cliente de referência (HTML + tweetnacl-j
 assinada no navegador, a privada nunca sai do cliente). Gere uma chave, crie a conta, faça
 login, peça uma cotação de `bitcoin` e confirme a ordem. Em menos de um minuto:
 
+![Cliente de referência nos modos dev e cliente](docs/client.png)
+
 ```json
 GET /api/portfolio
 {"cashBalance": 99500.00, "positions": [{"symbol": "bitcoin", "quantity": 0.01, ...}]}
