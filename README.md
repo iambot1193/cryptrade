@@ -7,6 +7,8 @@ senha), ordem de compra/venda assinada pelo cliente, cada lançamento vira um bl
 por hash. Saldo e posição são **projeções recalculáveis do log**, não fonte de verdade — se
 alguém adulterar o histórico direto no banco, `GET /ledger/verify` acusa exatamente onde.
 
+![Adulteração de um bloco no Postgres detectada por GET /ledger/verify](docs/demo.gif)
+
 ## A demo
 
 Sobe tudo com um comando:
